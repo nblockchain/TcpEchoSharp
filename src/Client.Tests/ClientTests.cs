@@ -34,7 +34,7 @@ namespace Client.Tests {
         };
 
         [Test]
-        public async Task ConnectWithElectrumServers () {
+        public async Task ConnectWithElectrumServersTransactionGet () {
             var hasAtLeastOneSuccessful = false;
             for (int i = 0; i < servers.Length; i++) {
                 try {
@@ -43,6 +43,23 @@ namespace Client.Tests {
                         17,
                         "2f309ef555110ab4e9c920faa2d43e64f195aa027e80ec28e1d243bd8929a2fc"
                     );
+                    Console.Error.WriteLine (result.Result); // Using stderr to show into the console
+                    hasAtLeastOneSuccessful = true;
+                    break;
+                } catch (Exception error) {
+                    Console.Error.WriteLine ($"Couldn't request {servers[i]}: {error}");
+                }
+            }
+            Assert.AreEqual (hasAtLeastOneSuccessful, true);
+        }
+
+        [Test]
+        public async Task ConnectWithElectrumServersEstimateFee () {
+            var hasAtLeastOneSuccessful = false;
+            for (int i = 0; i < servers.Length; i++) {
+                try {
+                    var client = new TcpEcho.StratumClient (servers[i], 50001);
+                    var result = await client.BlockchainEstimateFee (17, 6);
                     Console.Error.WriteLine (result.Result); // Using stderr to show into the console
                     hasAtLeastOneSuccessful = true;
                     break;

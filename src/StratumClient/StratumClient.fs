@@ -11,6 +11,13 @@ type BlockchainTransactionGet = {
     mutable Result: string
 }
 
+type BlockchainEstimateFee = {
+    [<JsonProperty(PropertyName = "id")>]
+    mutable Id: int
+    [<JsonProperty(PropertyName = "result")>]
+    mutable Result: double
+}
+
 type StratumClient(endpoint: string, port: int) =
     inherit Client(endpoint, port)
     member this.Call(json: string) = base.Call(json)
@@ -37,6 +44,27 @@ type StratumClient(endpoint: string, port: int) =
         let json = stringBuilder.ToString()
         let! returnedJson = this.Call(json) |> Async.AwaitTask
         let obj = JsonConvert.DeserializeObject<BlockchainTransactionGet>(returnedJson)
+        return obj
+    })
+    member this.BlockchainEstimateFee(id: int, blocks: int) = Async.StartAsTask(async {
+        let stringBuilder = new StringBuilder()
+        let stringWriter = new StringWriter(stringBuilder)
+        let jsonWriter = new JsonTextWriter(stringWriter)
+
+        jsonWriter.WriteStartObject()
+        jsonWriter.WritePropertyName("id")
+        jsonWriter.WriteValue(id)
+        jsonWriter.WritePropertyName("method")
+        jsonWriter.WriteValue("blockchain.estimatefee")
+        jsonWriter.WritePropertyName("params")
+        jsonWriter.WriteStartArray()
+        jsonWriter.WriteValue(blocks)
+        jsonWriter.WriteEnd()
+        jsonWriter.WriteEndObject()
+
+        let json = stringBuilder.ToString()
+        let! returnedJson = this.Call(json) |> Async.AwaitTask
+        let obj = JsonConvert.DeserializeObject<BlockchainEstimateFee>(returnedJson)
         return obj
     })
 
