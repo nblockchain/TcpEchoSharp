@@ -1,7 +1,5 @@
 namespace TcpEcho
 
-open System.IO
-open System.Text
 open Newtonsoft.Json
 
 type BlockchainTransactionGet = {
