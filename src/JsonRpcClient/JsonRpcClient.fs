@@ -17,6 +17,8 @@ type Client(endpoint: string, port: int) =
     let mkString (buffer: ReadOnlySequence<byte>) =
         seq { for segment in buffer -> segment.ToArray() |> Encoding.UTF8.GetString } |> Seq.fold (+) ""
 
+    let wrapAsync v asyncExp = async { let! _ = asyncExp in return v }
+
     let rec writeToPipeAsync (writer: PipeWriter) (socket: Socket) = async {
         let segment = Array.zeroCreate<byte> minimumBufferSize |> ArraySegment
         let! read = socket.ReceiveAsync(segment, SocketFlags.None) |> Async.AwaitTask
@@ -35,7 +37,7 @@ type Client(endpoint: string, port: int) =
 
     let rec readFromPipeAsync (reader: PipeReader) str = async {
         let! result = reader.ReadAsync().AsTask() |> Async.AwaitTask
-        let buffer : ReadOnlySequence<byte> = result.Buffer
+        let buffer: ReadOnlySequence<byte> = result.Buffer
         reader.AdvanceTo(buffer.End, buffer.End)
 
         let totalString = str + mkString buffer
@@ -46,8 +48,10 @@ type Client(endpoint: string, port: int) =
         | false ->
             return! readFromPipeAsync reader totalString
     }
-    abstract member Call: string -> Task<string>
-    default __.Call (json: string) =
+
+    abstract member CallAsync: string -> Async<string>
+    abstract member CallAsyncAsTask: string -> Task<string>
+    default __.CallAsync (json: string) =
         async {
             use socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
             do! socket.ConnectAsync(endpoint, port) |> Async.AwaitTask
@@ -58,9 +62,10 @@ type Client(endpoint: string, port: int) =
 
             let pipe = Pipe()
 
-            let writer = writeToPipeAsync pipe.Writer socket |> Async.StartAsTask
-            let reader = readFromPipeAsync pipe.Reader "" |> Async.StartAsTask
+            let! writer = writeToPipeAsync pipe.Writer socket |> wrapAsync "" |> Async.StartChild
+            let! reader = readFromPipeAsync pipe.Reader "" |> Async.StartChild
 
-            do! [ writer :> Task; reader :> Task] |> Task.WhenAll |> Async.AwaitTask
-            return! Async.AwaitTask reader
-        } |> Async.StartAsTask
+            let! result = Async.Parallel([reader; writer])
+            return result.[0]
+        }
+    default this.CallAsyncAsTask (json: string) = this.CallAsync json |> Async.StartAsTask
