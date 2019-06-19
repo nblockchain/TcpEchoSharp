@@ -12,35 +12,18 @@ type CommunicationUnsuccessfulException(msg: string, innerException: Exception) 
 
 [<AbstractClass>]
 type Client(endpoint: string, port: int) =
-#if NETCOREAPP2_1
-    let toString (segment : ReadOnlyMemory<byte>) = Encoding.UTF8.GetString segment.Span
-
-    let receiveAsync (socket: Socket) (buffer: Memory<byte>) (flags: SocketFlags) = SocketTaskExtensions.ReceiveAsync(socket, buffer, flags) |> fun s -> s.AsTask()
-#else
-    let toString (segment : ReadOnlyMemory<byte>) = segment.ToArray() |> Encoding.UTF8.GetString
-
-    let toArray (memory: ReadOnlyMemory<byte>) =
-        match System.Runtime.InteropServices.MemoryMarshal.TryGetArray(memory) with
-        | true, segment -> segment
-        | false, _ -> failwith "Buffer backed by array was expected"
-
-    let receiveAsync (socket: Socket) (buffer: Memory<byte>) (flags: SocketFlags) =
-        let segment = buffer |> Memory.op_Implicit |> toArray
-        SocketTaskExtensions.ReceiveAsync(socket, segment, flags)
-#endif
-
     let minimumBufferSize = 1024
 
     let mkString (buffer: ReadOnlySequence<byte>) =
-        seq { for segment in buffer -> toString segment } |> Seq.fold (+) ""
+        seq { for segment in buffer -> segment.ToArray() |> Encoding.UTF8.GetString } |> Seq.fold (+) ""
 
     let rec writeToPipeAsync (writer: PipeWriter) (socket: Socket) = async {
-        let memory = writer.GetMemory(minimumBufferSize)
-
-        let! read = receiveAsync socket memory SocketFlags.None |> Async.AwaitTask
+        let segment = Array.zeroCreate<byte> minimumBufferSize |> ArraySegment
+        let! read = socket.ReceiveAsync(segment, SocketFlags.None) |> Async.AwaitTask
         match read with
         | 0 -> return writer.Complete()
         | bytesRead ->
+            segment.Array.CopyTo(writer.GetMemory(bytesRead))
             writer.Advance bytesRead
             let! flusher = writer.FlushAsync().AsTask() |> Async.AwaitTask
             if flusher.IsCompleted then return writer.Complete()
