@@ -1,5 +1,7 @@
 namespace TcpEcho
 
+open System
+
 open Newtonsoft.Json
 
 type BlockchainTransactionGet = {
@@ -36,7 +38,12 @@ type StratumClient(endpoint: string, port: int) =
         }
         let json = JsonConvert.SerializeObject(request)
         let! returnedJson = this.Call json |> Async.AwaitTask
-        let obj = JsonConvert.DeserializeObject<BlockchainTransactionGet> returnedJson
+        let obj =
+            try
+                JsonConvert.DeserializeObject<BlockchainTransactionGet> returnedJson
+            with
+            | ex ->
+                raise <| Exception("Problem deserializing <<<<<<<<"+ returnedJson + ">>>>>>>>", ex)
         return obj
     })
     member this.BlockchainEstimateFee(id: int, blocks: int) = Async.StartAsTask(async {

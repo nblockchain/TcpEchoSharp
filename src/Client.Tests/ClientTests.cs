@@ -46,8 +46,13 @@ namespace Client.Tests {
                     Console.Error.WriteLine (result.Result); // Using stderr to show into the console
                     hasAtLeastOneSuccessful = true;
                     break;
-                } catch (Exception error) {
+                } catch (TcpEcho.ConnectionUnsuccessfulException error) {
                     Console.Error.WriteLine ($"Couldn't request {servers[i]}: {error}");
+                }
+                catch (AggregateException aggEx)
+                {
+                    if (!(aggEx.InnerException is TcpEcho.ConnectionUnsuccessfulException))
+                        throw;
                 }
             }
             Assert.AreEqual (hasAtLeastOneSuccessful, true);

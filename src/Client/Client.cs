@@ -9,6 +9,14 @@ using System.Threading.Tasks;
 
 
 namespace TcpEcho {
+
+    public class ConnectionUnsuccessfulException : Exception
+    {
+        internal ConnectionUnsuccessfulException(string msg, Exception innerException) : base(msg, innerException)
+        {
+        }
+    }
+
     public abstract class Client {
         private const int minimumBufferSize = 1024;
         private string endpoint = "";
@@ -19,7 +27,7 @@ namespace TcpEcho {
             port = _port;
         }
 
-        protected async Task<string> Call (string json) {
+        private async Task<string> CallImpl (string json) {
             using (Socket socket = new Socket (SocketType.Stream, ProtocolType.Tcp)) {
                 socket.ReceiveTimeout = 500;
 
@@ -35,6 +43,18 @@ namespace TcpEcho {
                 await Task.WhenAll (reading, writing);
 
                 return await reading;
+            }
+        }
+
+        protected async Task<string> Call(string json)
+        {
+            try
+            {
+                return await CallImpl(json);
+            }
+            catch (SocketException ex)
+            {
+                throw new ConnectionUnsuccessfulException(ex.Message, ex);
             }
         }
 
