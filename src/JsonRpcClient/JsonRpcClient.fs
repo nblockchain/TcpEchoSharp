@@ -17,22 +17,29 @@ type Client(endpoint: string, port: int) =
     let mkString (buffer: ReadOnlySequence<byte>) =
         seq { for segment in buffer -> segment.ToArray() |> Encoding.UTF8.GetString } |> Seq.fold (+) ""
 
-    let wrapAsync v asyncExp = async { let! _ = asyncExp in return v }
+    let withTimeout (timeout : int) (xAsync: Async<'a>) = async {
+        try
+            let! completor = Async.StartChild(xAsync, timeout)
+            let! value = completor
+            return Some value
+        with
+            :? TimeoutException -> return None
+    }
 
     let rec writeToPipeAsync (writer: PipeWriter) (socket: Socket) = async {
         let segment = Array.zeroCreate<byte> minimumBufferSize |> ArraySegment
-        let! read = socket.ReceiveAsync(segment, SocketFlags.None) |> Async.AwaitTask
+        let! read = socket.ReceiveAsync(segment, SocketFlags.None) |> Async.AwaitTask |> withTimeout socket.ReceiveTimeout
         match read with
-        | 0 -> return writer.Complete()
-        | bytesRead ->
+        | Some 0 | None ->
+            return writer.Complete()
+        | Some bytesRead ->
             segment.Array.CopyTo(writer.GetMemory(bytesRead))
             writer.Advance bytesRead
             let! flusher = writer.FlushAsync().AsTask() |> Async.AwaitTask
-            if flusher.IsCompleted then return writer.Complete()
-
-        match socket.Available with
-        | 0 -> return writer.Complete()
-        | _ -> return! writeToPipeAsync writer socket
+            if flusher.IsCompleted then
+                return writer.Complete()
+            else
+                return! writeToPipeAsync writer socket
     }
 
     let rec readFromPipeAsync (reader: PipeReader) str = async {
@@ -52,6 +59,7 @@ type Client(endpoint: string, port: int) =
     let CallImplAsync (json: string) =
         async {
             use socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
+            socket.ReceiveTimeout <- 500
             do! socket.ConnectAsync(endpoint, port) |> Async.AwaitTask
 
             let bytes = UTF8Encoding.UTF8.GetBytes(json + Environment.NewLine)
@@ -60,11 +68,8 @@ type Client(endpoint: string, port: int) =
 
             let pipe = Pipe()
 
-            let! writer = writeToPipeAsync pipe.Writer socket |> wrapAsync "" |> Async.StartChild
-            let! reader = readFromPipeAsync pipe.Reader "" |> Async.StartChild
-
-            let! result = Async.Parallel([reader; writer])
-            return result.[0]
+            let! _ = writeToPipeAsync pipe.Writer socket |> Async.StartChild
+            return! readFromPipeAsync pipe.Reader ""
         }
 
     abstract member CallAsync: string -> Async<string>
