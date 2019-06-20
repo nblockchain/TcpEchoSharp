@@ -49,9 +49,7 @@ type Client(endpoint: string, port: int) =
             return! readFromPipeAsync reader totalString
     }
 
-    abstract member CallAsync: string -> Async<string>
-    abstract member CallAsyncAsTask: string -> Task<string>
-    default __.CallAsync (json: string) =
+    let CallImplAsync (json: string) =
         async {
             use socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
             do! socket.ConnectAsync(endpoint, port) |> Async.AwaitTask
@@ -68,4 +66,20 @@ type Client(endpoint: string, port: int) =
             let! result = Async.Parallel([reader; writer])
             return result.[0]
         }
-    default this.CallAsyncAsTask (json: string) = this.CallAsync json |> Async.StartAsTask
+
+    abstract member CallAsync: string -> Async<string>
+    abstract member CallAsyncAsTask: string -> Task<string>
+
+    default __.CallAsync (json: string) =
+        async {
+            try
+                return! CallImplAsync json
+            with
+            | :? AggregateException as ae when ae.Flatten().InnerExceptions |> Seq.exists (fun x -> x :? SocketException) ->
+                return raise <| CommunicationUnsuccessfulException(ae.Message, ae)
+            | :? SocketException as ex ->
+                return raise <| CommunicationUnsuccessfulException(ex.Message, ex)
+        }
+
+    default this.CallAsyncAsTask (json: string) =
+        this.CallAsync json |> Async.StartAsTask
