@@ -1,0 +1,21 @@
+before_script:
+  - apt-get update
+  # needed for the configure script which may be useful if the pipeline changes
+  - apt-get install -y curl
+stages:
+  - test
+  
+tcpecho_test:
+  image: ubuntu:18.04
+  stage: test
+  script:
+  # Very sorry about those chmod but it is a bug of Github Desktop client for Windows
+    -  chmod 755 ./install_mono_from_microsoft_deb_packages.sh
+    -  chmod 755 ./make.sh
+    -  chmod 755 ./fsicheck.sh
+    -  chmod 755 ./configure.fsx
+    -  chmod 755 ./configure.sh
+    -  chmod 755 ./make.fsx
+    - ./install_mono_from_microsoft_deb_packages.sh
+    - apt install -y nunit-console
+    - time (./configure.sh && make restore && make && make check)
