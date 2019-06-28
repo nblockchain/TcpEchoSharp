@@ -19,6 +19,7 @@ namespace TcpEcho {
 
     public abstract class Client {
         private const int minimumBufferSize = 1024;
+        private const int tcpTimeout = 1000;
         private string endpoint = "";
         private int port = 0;
 
@@ -29,9 +30,9 @@ namespace TcpEcho {
 
         private async Task<string> CallImpl (string json) {
             using (Socket socket = new Socket (SocketType.Stream, ProtocolType.Tcp)) {
-                socket.ReceiveTimeout = 500;
+                socket.ReceiveTimeout = tcpTimeout;
 
-                if (!socket.ConnectAsync (endpoint, port).Wait (1000)) {
+                if (!socket.ConnectAsync (endpoint, port).Wait (tcpTimeout)) {
                     throw new TimeoutException("connect timed out");
                 }
 
