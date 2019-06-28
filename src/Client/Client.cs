@@ -32,7 +32,9 @@ namespace TcpEcho {
             using (Socket socket = new Socket (SocketType.Stream, ProtocolType.Tcp)) {
                 socket.ReceiveTimeout = tcpTimeout;
 
-                if (!socket.ConnectAsync (endpoint, port).Wait (tcpTimeout)) {
+                var timeOut = Task.Delay (tcpTimeout);
+                var completedTask = await Task.WhenAny (timeOut, socket.ConnectAsync (endpoint, port));
+                if (completedTask == timeOut) {
                     throw new TimeoutException("connect timed out");
                 }
 
