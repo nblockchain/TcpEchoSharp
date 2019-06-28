@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using System.Diagnostics;
 using NUnit.Framework;
 
 namespace Client.Tests {
@@ -73,6 +74,33 @@ namespace Client.Tests {
                 }
             }
             Assert.AreEqual (hasAtLeastOneSuccessful, true);
+        }
+
+        [Test]
+        public async Task ProperNonEternalTimeout()
+        {
+            var someRandomIP = "52.1.57.181";
+            bool? succesful = null;
+
+            var stopWatch = new Stopwatch();
+            stopWatch.Start();
+            try
+            {
+                var client = new TcpEcho.StratumClient(someRandomIP, 50001);
+                var result = await client.BlockchainTransactionGet(
+                    17,
+                    "2f309ef555110ab4e9c920faa2d43e64f195aa027e80ec28e1d243bd8929a2fc"
+                );
+                succesful = true;
+            }
+            catch
+            {
+                succesful = false;
+                stopWatch.Stop();
+            }
+            Assert.That(succesful.HasValue, Is.EqualTo(true), "test is broken?");
+            Assert.That(succesful.Value, Is.EqualTo(false), "IP is not too random? port was open actually!");
+            Assert.That(stopWatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(2)));
         }
     }
 }

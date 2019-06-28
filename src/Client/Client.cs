@@ -31,7 +31,9 @@ namespace TcpEcho {
             using (Socket socket = new Socket (SocketType.Stream, ProtocolType.Tcp)) {
                 socket.ReceiveTimeout = 500;
 
-                await socket.ConnectAsync (endpoint, port);
+                if (!socket.ConnectAsync (endpoint, port).Wait (1000)) {
+                    throw new TimeoutException("connect timed out");
+                }
 
                 byte[] bytesToSend = UTF8Encoding.UTF8.GetBytes (json + Environment.NewLine);
                 socket.Send (bytesToSend);
