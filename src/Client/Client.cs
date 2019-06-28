@@ -61,6 +61,10 @@ namespace TcpEcho {
             {
                 throw new ConnectionUnsuccessfulException(ex.Message, ex);
             }
+            catch (TimeoutException ex)
+            {
+                throw new ConnectionUnsuccessfulException(ex.Message, ex);
+            }
         }
 
         private static async Task WriteToPipeAsync (Socket socket, PipeWriter writer) {
