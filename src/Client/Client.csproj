@@ -9,5 +9,6 @@
 
   <ItemGroup>
     <PackageReference Include="System.IO.Pipelines" Version="4.5.0" />
+    <PackageReference Include="NLog" Version="4.6.5" />
   </ItemGroup>
 </Project>

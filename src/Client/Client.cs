@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+using NLog;
 using System;
 using System.Buffers;
 using System.IO.Pipelines;
@@ -21,6 +21,7 @@ namespace TcpEcho {
         private const int minimumBufferSize = 1024;
         private const int tcpTimeout = 1000;
         private string endpoint = "";
+        private static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
         private int port = 0;
 
         public Client (string _endpoint, int _port) {
@@ -85,17 +86,28 @@ namespace TcpEcho {
 
                 writer.Advance (read);
 
+                logger.Debug("WriteToPipeAsync: Before FlushAsync");
+
                 if ((result = await writer.FlushAsync ()).IsCompleted) {
                     break;
                 }
+
+                logger.Debug("WriteToPipeAsync: After FlushAsync");
+            }
 
             writer.Complete ();
         }
 
         private static async Task<string> ReadFromPipeAsync (PipeReader reader) {
             var strResult = "";
+
             while (true) {
+                logger.Debug("ReadFromPipeAsync: Before ReadAsync");
+
                 ReadResult result = await reader.ReadAsync ();
+
+                logger.Debug("ReadFromPipeAsync: After ReadAsync");
+
                 ReadOnlySequence<byte> buffer = result.Buffer;
 
                 var content = UTF8String (buffer);
