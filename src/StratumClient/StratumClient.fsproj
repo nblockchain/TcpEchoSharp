@@ -10,7 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="../Client/Client.csproj" />
     <PackageReference Include="System.IO.Pipelines" Version="4.5.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
     <Compile Include="StratumClient.fs" />
   </ItemGroup>
 </Project>
