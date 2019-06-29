@@ -36,7 +36,7 @@ namespace Client.Tests {
 
         [Test]
         public async Task ConnectWithElectrumServersTransactionGet () {
-            var hasAtLeastOneSuccessful = false;
+            var successfulCount = 0;
             Console.WriteLine();
             for (int i = 0; i < servers.Length; i++) {
                 Console.Write($"Trying to query '{servers[i]}'... ");
@@ -47,8 +47,7 @@ namespace Client.Tests {
                         "2f309ef555110ab4e9c920faa2d43e64f195aa027e80ec28e1d243bd8929a2fc"
                     );
                     Console.WriteLine("success");
-                    hasAtLeastOneSuccessful = true;
-                    break;
+                    successfulCount++;
                 } catch (TcpEcho.CommunicationUnsuccessfulException error) {
                     Console.Error.WriteLine ("failure");
                 }
@@ -59,7 +58,7 @@ namespace Client.Tests {
                     Console.Error.WriteLine ("failure");
                 }
             }
-            Assert.AreEqual (hasAtLeastOneSuccessful, true);
+            Assert.That (successfulCount, Is.GreaterThan(1));
         }
 
         [Test]
