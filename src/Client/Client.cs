@@ -76,7 +76,7 @@ namespace TcpEcho {
             int read = 0;
             FlushResult result;
 
-            do {
+            while (true) {
                 Memory<byte> memory = writer.GetMemory (minimumBufferSize);
 
                 if ((read = await socket.ReceiveAsync(memory, SocketFlags.None)) == 0) {
@@ -88,8 +88,6 @@ namespace TcpEcho {
                 if ((result = await writer.FlushAsync ()).IsCompleted) {
                     break;
                 }
-            }
-            while (socket.Available > 0);
 
             writer.Complete ();
         }
@@ -102,13 +100,14 @@ namespace TcpEcho {
 
                 var content = UTF8String (buffer);
                 strResult += content;
-                reader.AdvanceTo (buffer.End, buffer.End);
+                reader.AdvanceTo (buffer.End);
 
-                if (result.IsCompleted) {
+                if (strResult[strResult.Length - 1] == '\n' || result.IsCompleted) {
                     break;
                 }
             }
 
+            reader.Complete();
             return strResult;
         }
 
