@@ -37,23 +37,26 @@ namespace Client.Tests {
         [Test]
         public async Task ConnectWithElectrumServersTransactionGet () {
             var hasAtLeastOneSuccessful = false;
+            Console.WriteLine();
             for (int i = 0; i < servers.Length; i++) {
+                Console.Write($"Trying to query '{servers[i]}'... ");
                 try {
                     var client = new TcpEcho.StratumClient (servers[i], 50001);
                     var result = await client.BlockchainTransactionGet (
                         17,
                         "2f309ef555110ab4e9c920faa2d43e64f195aa027e80ec28e1d243bd8929a2fc"
                     );
-                    Console.Error.WriteLine (result.Result); // Using stderr to show into the console
+                    Console.WriteLine("success");
                     hasAtLeastOneSuccessful = true;
                     break;
                 } catch (TcpEcho.ConnectionUnsuccessfulException error) {
-                    Console.Error.WriteLine ($"Couldn't request {servers[i]}: {error}");
+                    Console.Error.WriteLine ("failure");
                 }
                 catch (AggregateException aggEx)
                 {
                     if (!(aggEx.InnerException is TcpEcho.ConnectionUnsuccessfulException))
                         throw;
+                    Console.Error.WriteLine ("failure");
                 }
             }
             Assert.AreEqual (hasAtLeastOneSuccessful, true);
