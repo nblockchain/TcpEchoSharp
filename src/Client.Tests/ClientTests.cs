@@ -1,8 +1,10 @@
 using System;
 using System.Threading.Tasks;
+using System.Diagnostics;
 using NUnit.Framework;
 
 namespace Client.Tests {
+
     [TestFixture]
     public class ClientTest {
         public static readonly string[] servers = {
@@ -33,46 +35,73 @@ namespace Client.Tests {
             "y4td57fxytoo5ki7.onion",
         };
 
-        [Test]
-        public async Task ConnectWithElectrumServersTransactionGet () {
-            var hasAtLeastOneSuccessful = false;
+        private async Task LoopThroughElectrumServers (Func<TcpEcho.StratumClient,Task> action) {
+            var successfulCount = 0;
+            Console.WriteLine();
             for (int i = 0; i < servers.Length; i++) {
+                Console.Write($"Trying to query '{servers[i]}'... ");
                 try {
                     var client = new TcpEcho.StratumClient (servers[i], 50001);
-                    var result = await client.BlockchainTransactionGet (
-                        17,
-                        "2f309ef555110ab4e9c920faa2d43e64f195aa027e80ec28e1d243bd8929a2fc"
-                    );
-                    Console.Error.WriteLine (result.Result); // Using stderr to show into the console
-                    hasAtLeastOneSuccessful = true;
-                    break;
-                } catch (TcpEcho.ConnectionUnsuccessfulException error) {
-                    Console.Error.WriteLine ($"Couldn't request {servers[i]}: {error}");
+                    await action(client);
+                    Console.WriteLine("success");
+                    successfulCount++;
+                } catch (TcpEcho.CommunicationUnsuccessfulException error) {
+                    Console.Error.WriteLine ("failure");
                 }
                 catch (AggregateException aggEx)
                 {
-                    if (!(aggEx.InnerException is TcpEcho.ConnectionUnsuccessfulException))
+                    if (!(aggEx.InnerException is TcpEcho.CommunicationUnsuccessfulException))
                         throw;
+                    Console.Error.WriteLine ("failure");
                 }
             }
-            Assert.AreEqual (hasAtLeastOneSuccessful, true);
+            Assert.That (successfulCount, Is.GreaterThan(1));
+        }
+
+        [Test]
+        public async Task ConnectWithElectrumServersTransactionGet () {
+            await LoopThroughElectrumServers(async client => {
+                var result = await client.BlockchainTransactionGet (
+                    17,
+                    "2f309ef555110ab4e9c920faa2d43e64f195aa027e80ec28e1d243bd8929a2fc"
+                );
+                Assert.That(result, Is.Not.Null);
+            });
         }
 
         [Test]
         public async Task ConnectWithElectrumServersEstimateFee () {
-            var hasAtLeastOneSuccessful = false;
-            for (int i = 0; i < servers.Length; i++) {
-                try {
-                    var client = new TcpEcho.StratumClient (servers[i], 50001);
-                    var result = await client.BlockchainEstimateFee (17, 6);
-                    Console.Error.WriteLine (result.Result); // Using stderr to show into the console
-                    hasAtLeastOneSuccessful = true;
-                    break;
-                } catch (Exception error) {
-                    Console.Error.WriteLine ($"Couldn't request {servers[i]}: {error}");
-                }
+            await LoopThroughElectrumServers(async client => {
+                var result = await client.BlockchainEstimateFee (17, 6);
+                Assert.That(result, Is.Not.Null);
+            });
+        }
+
+        [Test]
+        public async Task ProperNonEternalTimeout()
+        {
+            var someRandomIP = "52.1.57.181";
+            bool? succesful = null;
+
+            var stopWatch = new Stopwatch();
+            stopWatch.Start();
+            try
+            {
+                var client = new TcpEcho.StratumClient(someRandomIP, 50001);
+                var result = await client.BlockchainTransactionGet(
+                    17,
+                    "2f309ef555110ab4e9c920faa2d43e64f195aa027e80ec28e1d243bd8929a2fc"
+                );
+                succesful = true;
             }
-            Assert.AreEqual (hasAtLeastOneSuccessful, true);
+            catch
+            {
+                succesful = false;
+                stopWatch.Stop();
+            }
+            Assert.That(succesful.HasValue, Is.EqualTo(true), "test is broken?");
+            Assert.That(succesful.Value, Is.EqualTo(false), "IP is not too random? port was open actually!");
+            Assert.That(stopWatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(2)));
         }
     }
 }

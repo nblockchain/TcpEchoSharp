@@ -10,15 +10,16 @@ using System.Threading.Tasks;
 
 namespace TcpEcho {
 
-    public class ConnectionUnsuccessfulException : Exception
+    public class CommunicationUnsuccessfulException : Exception
     {
-        internal ConnectionUnsuccessfulException(string msg, Exception innerException) : base(msg, innerException)
+        internal CommunicationUnsuccessfulException(string msg, Exception innerException) : base(msg, innerException)
         {
         }
     }
 
     public abstract class Client {
         private const int minimumBufferSize = 1024;
+        private const int tcpTimeout = 1000;
         private string endpoint = "";
         private int port = 0;
 
@@ -29,9 +30,13 @@ namespace TcpEcho {
 
         private async Task<string> CallImpl (string json) {
             using (Socket socket = new Socket (SocketType.Stream, ProtocolType.Tcp)) {
-                socket.ReceiveTimeout = 500;
+                socket.ReceiveTimeout = tcpTimeout;
 
-                await socket.ConnectAsync (endpoint, port);
+                var connectTimeOut = Task.Delay (tcpTimeout);
+                var completedConnTask = await Task.WhenAny (connectTimeOut, socket.ConnectAsync (endpoint, port));
+                if (completedConnTask == connectTimeOut) {
+                    throw new TimeoutException("connect timed out");
+                }
 
                 byte[] bytesToSend = UTF8Encoding.UTF8.GetBytes (json + Environment.NewLine);
                 socket.Send (bytesToSend);
@@ -40,7 +45,12 @@ namespace TcpEcho {
                 var writing = WriteToPipeAsync (socket, pipe.Writer);
                 var reading = ReadFromPipeAsync (pipe.Reader);
 
-                await Task.WhenAll (reading, writing);
+                var readAndWriteTask = Task.WhenAll (reading, writing);
+                var readTimeOut = Task.Delay (tcpTimeout);
+                var completedReadTask = await Task.WhenAny (readTimeOut, readAndWriteTask);
+                if (completedReadTask == readTimeOut) {
+                    throw new TimeoutException("reading/writing from socket timed out");
+                }
 
                 return await reading;
             }
@@ -54,7 +64,11 @@ namespace TcpEcho {
             }
             catch (SocketException ex)
             {
-                throw new ConnectionUnsuccessfulException(ex.Message, ex);
+                throw new CommunicationUnsuccessfulException(ex.Message, ex);
+            }
+            catch (TimeoutException ex)
+            {
+                throw new CommunicationUnsuccessfulException(ex.Message, ex);
             }
         }
 
