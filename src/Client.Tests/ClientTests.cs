@@ -4,6 +4,7 @@ using System.Diagnostics;
 using NUnit.Framework;
 
 namespace Client.Tests {
+
     [TestFixture]
     public class ClientTest {
         public static readonly string[] servers = {
@@ -34,18 +35,14 @@ namespace Client.Tests {
             "y4td57fxytoo5ki7.onion",
         };
 
-        [Test]
-        public async Task ConnectWithElectrumServersTransactionGet () {
+        private async Task LoopThroughElectrumServers (Func<TcpEcho.StratumClient,Task> action) {
             var successfulCount = 0;
             Console.WriteLine();
             for (int i = 0; i < servers.Length; i++) {
                 Console.Write($"Trying to query '{servers[i]}'... ");
                 try {
                     var client = new TcpEcho.StratumClient (servers[i], 50001);
-                    var result = await client.BlockchainTransactionGet (
-                        17,
-                        "2f309ef555110ab4e9c920faa2d43e64f195aa027e80ec28e1d243bd8929a2fc"
-                    );
+                    await action(client);
                     Console.WriteLine("success");
                     successfulCount++;
                 } catch (TcpEcho.CommunicationUnsuccessfulException error) {
@@ -62,20 +59,22 @@ namespace Client.Tests {
         }
 
         [Test]
+        public async Task ConnectWithElectrumServersTransactionGet () {
+            await LoopThroughElectrumServers(async client => {
+                var result = await client.BlockchainTransactionGet (
+                    17,
+                    "2f309ef555110ab4e9c920faa2d43e64f195aa027e80ec28e1d243bd8929a2fc"
+                );
+                Assert.That(result, Is.Not.Null);
+            });
+        }
+
+        [Test]
         public async Task ConnectWithElectrumServersEstimateFee () {
-            var hasAtLeastOneSuccessful = false;
-            for (int i = 0; i < servers.Length; i++) {
-                try {
-                    var client = new TcpEcho.StratumClient (servers[i], 50001);
-                    var result = await client.BlockchainEstimateFee (17, 6);
-                    Console.Error.WriteLine (result.Result); // Using stderr to show into the console
-                    hasAtLeastOneSuccessful = true;
-                    break;
-                } catch (Exception error) {
-                    Console.Error.WriteLine ($"Couldn't request {servers[i]}: {error}");
-                }
-            }
-            Assert.AreEqual (hasAtLeastOneSuccessful, true);
+            await LoopThroughElectrumServers(async client => {
+                var result = await client.BlockchainEstimateFee (17, 6);
+                Assert.That(result, Is.Not.Null);
+            });
         }
 
         [Test]
