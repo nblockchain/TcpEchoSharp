@@ -49,12 +49,12 @@ namespace Client.Tests {
                     Console.WriteLine("success");
                     hasAtLeastOneSuccessful = true;
                     break;
-                } catch (TcpEcho.ConnectionUnsuccessfulException error) {
+                } catch (TcpEcho.CommunicationUnsuccessfulException error) {
                     Console.Error.WriteLine ("failure");
                 }
                 catch (AggregateException aggEx)
                 {
-                    if (!(aggEx.InnerException is TcpEcho.ConnectionUnsuccessfulException))
+                    if (!(aggEx.InnerException is TcpEcho.CommunicationUnsuccessfulException))
                         throw;
                     Console.Error.WriteLine ("failure");
                 }
