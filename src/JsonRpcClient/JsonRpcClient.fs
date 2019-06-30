@@ -86,9 +86,9 @@ type Client(endpoint: string, port: int) =
             socket.ReceiveTimeout <- 500
             do! socket.ConnectAsync(endpoint, port) |> Async.AwaitTask
 
-            let bytes = UTF8Encoding.UTF8.GetBytes(json + Environment.NewLine)
+            let segment = UTF8Encoding.UTF8.GetBytes(json + Environment.NewLine) |> ArraySegment
 
-            socket.Send(bytes) |> ignore
+            do! socket.SendAsync(segment, SocketFlags.None) |> Async.AwaitTask |> Async.Ignore
 
             let pipe = Pipe()
 
