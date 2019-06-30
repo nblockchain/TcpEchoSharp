@@ -84,16 +84,19 @@ type Client(endpoint: string, port: int) =
         async {
             use socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
             socket.ReceiveTimeout <- 500
+            socket.SendTimeout <- 500
             do! socket.ConnectAsync(endpoint, port) |> Async.AwaitTask
 
             let segment = UTF8Encoding.UTF8.GetBytes(json + Environment.NewLine) |> ArraySegment
 
-            do! socket.SendAsync(segment, SocketFlags.None) |> Async.AwaitTask |> Async.Ignore
+            let! send = socket.SendAsync(segment, SocketFlags.None) |> Async.AwaitTask |> withTimeout socket.SendTimeout
+            match send with
+            | Result _ ->
+                let pipe = Pipe()
 
-            let pipe = Pipe()
-
-            let! _ = writeToPipeAsync pipe.Writer socket |> Async.StartChild
-            return! readFromPipeAsync pipe.Reader ""
+                let! _ = writeToPipeAsync pipe.Writer socket |> Async.StartChild
+                return! readFromPipeAsync pipe.Reader ""
+            | Timeout -> return raise (CommunicationUnsuccessfulException("Socket send timed out", null))
         }
 
     abstract member CallAsync: string -> Async<string>
