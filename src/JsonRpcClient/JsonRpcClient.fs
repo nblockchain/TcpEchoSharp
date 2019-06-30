@@ -23,19 +23,29 @@ type Client(endpoint: string, port: int) =
             segment.ToArray() |> Encoding.UTF8.GetString |> sb.Append |> ignore
         sb.ToString()
 
-    let withTimeout (timeout : int) (xTask: Task<'a>) = async {
-        let delay = Task.Delay(timeout)
-        let! timoutTask = Task.WhenAny(xTask, delay) |> Async.AwaitTask
-        return if timoutTask = delay then Timeout else Result xTask.Result
+    let withTimeout (timeout : int) (xAsync: Async<'a>) = async {
+        let read = async {
+            let! value = xAsync
+            return value |> Result |> Some
+        }
+        let delay = async {
+            do! Async.Sleep(timeout)
+            return Some Timeout
+        }
+
+        match! Async.Choice([read; delay]) with
+        | Some x -> return x
+        | None -> return Timeout
     }
 
     let rec writeToPipeAsync (writer: PipeWriter) (socket: Socket) = async {
         let segment = Array.zeroCreate<byte> minimumBufferSize |> ArraySegment
-        let! read = socket.ReceiveAsync(segment, SocketFlags.None) |> withTimeout socket.ReceiveTimeout
+        let! read = socket.ReceiveAsync(segment, SocketFlags.None) |> Async.AwaitTask |> withTimeout socket.ReceiveTimeout
+
         match read with
         | Timeout ->
             return writer.Complete(TimeoutException("Socket read timed out"))
-         | Result 0 ->
+        | Result 0 ->
             return writer.Complete()
         | Result bytesRead ->
             segment.Array.CopyTo(writer.GetMemory(bytesRead))
