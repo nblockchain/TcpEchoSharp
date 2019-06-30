@@ -18,7 +18,10 @@ type Client(endpoint: string, port: int) =
     let minimumBufferSize = 1024
 
     let mkString (buffer: ReadOnlySequence<byte>) =
-        seq { for segment in buffer -> segment.ToArray() |> Encoding.UTF8.GetString } |> Seq.fold (+) ""
+        let sb = StringBuilder()
+        for segment in buffer do
+            segment.ToArray() |> Encoding.UTF8.GetString |> sb.Append |> ignore
+        sb.ToString()
 
     let withTimeout (timeout : int) (xTask: Task<'a>) = async {
         let delay = Task.Delay(timeout)
