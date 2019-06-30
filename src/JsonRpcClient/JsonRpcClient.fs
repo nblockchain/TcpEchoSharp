@@ -45,9 +45,9 @@ type Client(endpoint: string, port: int) =
     }
 
     let rec readFromPipeAsync (reader: PipeReader) str = async {
-        let! result = reader.ReadAsync().AsTask() |> Async.AwaitTask |> Async.Catch
-        match result with
-        | Choice1Of2 result ->
+        try
+            let! result = reader.ReadAsync().AsTask() |> Async.AwaitTask
+
             let buffer: ReadOnlySequence<byte> = result.Buffer
 
             let totalString = str + mkString buffer
@@ -59,12 +59,11 @@ type Client(endpoint: string, port: int) =
                 return totalString
             | false ->
                 return! readFromPipeAsync reader totalString
-        | Choice2Of2 ex ->
-            match ex with
+        with
             // If we got an TimeoutException anywhere in the exception chain
             | :? AggregateException as ae when ae.Flatten().InnerExceptions |> Seq.exists (fun x -> x :? TimeoutException) ->
                 return raise <| IncompleteResponseException str
-            | _ ->
+            | ex ->
                 return raise ex
     }
 
