@@ -1,0 +1,15 @@
+before_script:
+  - apt-get update
+stages:
+  - test
+  
+tcpecho_test:
+  image: ubuntu:18.04
+  stage: test
+  script:
+  # Installing mono
+    -  chmod 755 ./install_mono_from_microsoft_deb_packages.sh
+    -  chmod 755 ./make.sh  
+    - ./install_mono_from_microsoft_deb_packages.sh
+    - apt install -y nunit-console
+    - time (make && make check)
