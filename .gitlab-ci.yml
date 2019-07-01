@@ -1,0 +1,33 @@
+before_script:
+  - apt-get update
+
+stages:
+  - build
+  - test
+
+newmono_build:
+  image: ubuntu:18.04
+  stage: build
+  script:
+    - ./install_mono_from_microsoft_deb_packages.sh
+
+    # NOTE: this is needed as a workaround to this bug: https://github.com/mono/mono/issues/10570
+    - ./install_dotnet_sdk_from_microsoft_deb_packages.sh
+
+    - msbuild /t:restore TcpEcho.sln
+    - msbuild /t:build TcpEcho.sln
+
+newmono_test:
+  image: ubuntu:18.04
+  stage: test
+  script:
+    - ./install_mono_from_microsoft_deb_packages.sh
+
+    # NOTE: this is needed as a workaround to this bug: https://github.com/mono/mono/issues/10570
+    - ./install_dotnet_sdk_from_microsoft_deb_packages.sh
+
+    - msbuild /t:restore TcpEcho.sln
+    - msbuild /t:build TcpEcho.sln
+
+    - apt install -y nunit-console
+    - nunit-console src/Client.Tests/bin/Debug/net461/ClientTests.dll
