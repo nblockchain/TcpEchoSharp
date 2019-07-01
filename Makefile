@@ -3,6 +3,3 @@ all:
 
 check:
 	@./make.sh check
-	
-restore:
-	@./make.sh restore
