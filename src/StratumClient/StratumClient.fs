@@ -29,6 +29,14 @@ type Request = {
 
 type StratumClient(endpoint: string, port: int) =
     inherit Client(endpoint, port)
+
+    static member Deserialize<'T> json: 'T =
+        try
+            JsonConvert.DeserializeObject<'T> json
+        with
+        | ex ->
+            failwithf "Problem deserializing <<<<<<<<%s>>>>>>>>" json
+
     member this.Call(json: string) = base.Call(json)
     member this.BlockchainTransactionGet(id: int, transactionId: string) = Async.StartAsTask(async {
         let request: Request = {
@@ -38,12 +46,7 @@ type StratumClient(endpoint: string, port: int) =
         }
         let json = JsonConvert.SerializeObject(request)
         let! returnedJson = this.Call json |> Async.AwaitTask
-        let obj =
-            try
-                JsonConvert.DeserializeObject<BlockchainTransactionGet> returnedJson
-            with
-            | ex ->
-                raise <| Exception("Problem deserializing <<<<<<<<"+ returnedJson + ">>>>>>>>", ex)
+        let obj = StratumClient.Deserialize<BlockchainTransactionGet> returnedJson
         return obj
     })
     member this.BlockchainEstimateFee(id: int, blocks: int) = Async.StartAsTask(async {
@@ -54,7 +57,7 @@ type StratumClient(endpoint: string, port: int) =
         }
         let json = JsonConvert.SerializeObject(request)
         let! returnedJson = this.Call json |> Async.AwaitTask
-        let obj = JsonConvert.DeserializeObject<BlockchainEstimateFee> returnedJson
+        let obj = StratumClient.Deserialize<BlockchainEstimateFee> returnedJson
         return obj
     })
 
