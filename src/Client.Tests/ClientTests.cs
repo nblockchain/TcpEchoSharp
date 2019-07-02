@@ -35,7 +35,7 @@ namespace Client.Tests {
             "y4td57fxytoo5ki7.onion",
         };
 
-        private async Task LoopThroughElectrumServers (Func<TcpEcho.StratumClient,Task> action) {
+        private async Task LoopThroughElectrumServers (Func<TcpEcho.StratumClient,Task> action, uint repeatTimes = 0) {
             var successfulCount = 0;
             Console.WriteLine();
             for (int i = 0; i < servers.Length; i++) {
@@ -55,7 +55,12 @@ namespace Client.Tests {
                     Console.Error.WriteLine ("failure");
                 }
             }
+            var successRatePercentage = 100.0 * successfulCount / servers.Length;
+            Console.WriteLine("Success rate: " + successRatePercentage + "%");
             Assert.That (successfulCount, Is.GreaterThan(1));
+
+            if (repeatTimes > 0)
+                await LoopThroughElectrumServers(action, repeatTimes - 1);
         }
 
         [Test]
@@ -66,7 +71,7 @@ namespace Client.Tests {
                     "2f309ef555110ab4e9c920faa2d43e64f195aa027e80ec28e1d243bd8929a2fc"
                 );
                 Assert.That(result, Is.Not.Null);
-            });
+            }, 2);
         }
 
         [Test]
@@ -74,7 +79,7 @@ namespace Client.Tests {
             await LoopThroughElectrumServers(async client => {
                 var result = await client.BlockchainEstimateFee (17, 6);
                 Assert.That(result, Is.Not.Null);
-            });
+            }, 2);
         }
 
         [Test]
