@@ -7,6 +7,9 @@ open System.IO.Pipelines
 open System.Text
 open System.Threading.Tasks
 
+type CommunicationUnsuccessfulException(msg: string, innerException: Exception) =
+    inherit Exception(msg, innerException)
+
 [<AbstractClass>]
 type Client(endpoint: string, port: int) =
 #if NETCOREAPP2_1
