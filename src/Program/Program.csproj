@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../JsonRpcClient/JsonRpcClient.csproj" />
+    <ProjectReference Include="../JsonRpcClient/JsonRpcClient.fsproj" />
     <ProjectReference Include="../StratumClient/StratumClient.fsproj" />
     <PackageReference Include="System.IO.Pipelines" Version="4.5.0" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
