@@ -2,6 +2,7 @@
 
 open System
 
+open System
 open Newtonsoft.Json
 
 type BlockchainTransactionGet = {
@@ -31,6 +32,7 @@ type StratumClient(endpoint: string, port: int) =
     inherit JsonRpcClient(endpoint, port)
 
     static member Deserialize<'T> json: 'T =
+        if String.IsNullOrWhiteSpace(json) then failwith "Invalid json format, the server response was empty"
         try
             JsonConvert.DeserializeObject<'T> json
         with
@@ -41,10 +43,10 @@ type StratumClient(endpoint: string, port: int) =
         let! result = json |> this.CallAsync |> Async.Catch
         match result with
         | Choice1Of2 x -> return x
-        | Choice2Of2 ex -> 
+        | Choice2Of2 ex ->
             match ex with
             // The data may be incomplete, corrupted, or just fine so lets try parse it anyways
-            | IncompleteResponseException response -> return response 
+            | IncompleteResponseException response -> return response
             | ex -> return raise ex
     }
 
