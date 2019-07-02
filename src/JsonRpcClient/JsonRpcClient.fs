@@ -41,7 +41,7 @@ type Client(endpoint: string, port: int) =
             if flusher.IsCompleted then
                 return writer.Complete()
             else
-                return! writeToPipeAsync writer socket 
+                return! writeToPipeAsync writer socket
     }
 
     let rec readFromPipeAsync (reader: PipeReader) str = async {
@@ -49,17 +49,23 @@ type Client(endpoint: string, port: int) =
         match result with
         | Choice1Of2 result ->
             let buffer: ReadOnlySequence<byte> = result.Buffer
-            reader.AdvanceTo(buffer.End, buffer.End)
 
             let totalString = str + mkString buffer
+            reader.AdvanceTo(buffer.End)
+
             match result.IsCompleted with
             | true ->
                 reader.Complete()
                 return totalString
             | false ->
                 return! readFromPipeAsync reader totalString
-        | Choice2Of2 _ -> // AggregateException, so we cant match on TimeoutException
-            return raise <| IncompleteResponseException str
+        | Choice2Of2 ex ->
+            match ex with
+            // If we got an TimeoutException anywhere in the exception chain
+            | :? AggregateException as ae when ae.Flatten().InnerExceptions |> Seq.exists (fun x -> x :? TimeoutException) ->
+                return raise <| IncompleteResponseException str
+            | _ ->
+                return raise ex
     }
 
     let CallImplAsync (json: string) =
@@ -86,6 +92,10 @@ type Client(endpoint: string, port: int) =
             try
                 return! CallImplAsync json
             with
+            | IncompleteResponseException response as ex when String.IsNullOrWhiteSpace(response) ->
+                return raise <| CommunicationUnsuccessfulException("Empty response from socket", ex)
+            | IncompleteResponseException _ as ex ->
+                return raise <| ex
             | :? AggregateException as ae when ae.Flatten().InnerExceptions |> Seq.exists (fun x -> x :? SocketException) ->
                 return raise <| CommunicationUnsuccessfulException(ae.Message, ae)
             | :? SocketException as ex ->
