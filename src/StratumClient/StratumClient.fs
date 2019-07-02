@@ -37,7 +37,16 @@ type StratumClient(endpoint: string, port: int) =
         | ex ->
             failwithf "Problem deserializing <<<<<<<<%s>>>>>>>>" json
 
-    member this.Call(json: string) = base.CallAsync(json)
+    member this.Call(json: string) = async {
+        let! result = json |> this.CallAsync |> Async.Catch
+        match result with
+        | Choice1Of2 x -> return x
+        | Choice2Of2 ex -> 
+            match ex with
+            // The data may be incomplete, corrupted, or just fine so lets try parse it anyways
+            | IncompleteResponseException response -> return response 
+            | ex -> return raise ex
+    }
 
     member this.BlockchainTransactionGet(id: int, transactionId: string) = Async.StartAsTask(async {
         let request: Request = {

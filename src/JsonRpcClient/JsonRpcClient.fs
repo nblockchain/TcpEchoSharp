@@ -10,6 +10,9 @@ open System.Threading.Tasks
 type CommunicationUnsuccessfulException(msg: string, innerException: Exception) =
     inherit Exception(msg, innerException)
 
+exception IncompleteResponseException of string
+type TimeoutOrResult<'a> = Timeout | Result of 'a
+
 [<AbstractClass>]
 type Client(endpoint: string, port: int) =
     let minimumBufferSize = 1024
@@ -17,43 +20,46 @@ type Client(endpoint: string, port: int) =
     let mkString (buffer: ReadOnlySequence<byte>) =
         seq { for segment in buffer -> segment.ToArray() |> Encoding.UTF8.GetString } |> Seq.fold (+) ""
 
-    let withTimeout (timeout : int) (xAsync: Async<'a>) = async {
-        try
-            let! completor = Async.StartChild(xAsync, timeout)
-            let! value = completor
-            return Some value
-        with
-            :? TimeoutException -> return None
+    let withTimeout (timeout : int) (xTask: Task<'a>) = async {
+        let delay = Task.Delay(timeout)
+        let! timoutTask = Task.WhenAny(xTask, delay) |> Async.AwaitTask
+        return if timoutTask = delay then Timeout else Result xTask.Result
     }
 
     let rec writeToPipeAsync (writer: PipeWriter) (socket: Socket) = async {
         let segment = Array.zeroCreate<byte> minimumBufferSize |> ArraySegment
-        let! read = socket.ReceiveAsync(segment, SocketFlags.None) |> Async.AwaitTask |> withTimeout socket.ReceiveTimeout
+        let! read = socket.ReceiveAsync(segment, SocketFlags.None) |> withTimeout socket.ReceiveTimeout
         match read with
-        | Some 0 | None ->
+        | Timeout ->
+            return writer.Complete(TimeoutException("Socket read timed out"))
+         | Result 0 ->
             return writer.Complete()
-        | Some bytesRead ->
+        | Result bytesRead ->
             segment.Array.CopyTo(writer.GetMemory(bytesRead))
             writer.Advance bytesRead
             let! flusher = writer.FlushAsync().AsTask() |> Async.AwaitTask
             if flusher.IsCompleted then
                 return writer.Complete()
             else
-                return! writeToPipeAsync writer socket
+                return! writeToPipeAsync writer socket 
     }
 
     let rec readFromPipeAsync (reader: PipeReader) str = async {
-        let! result = reader.ReadAsync().AsTask() |> Async.AwaitTask
-        let buffer: ReadOnlySequence<byte> = result.Buffer
-        reader.AdvanceTo(buffer.End, buffer.End)
+        let! result = reader.ReadAsync().AsTask() |> Async.AwaitTask |> Async.Catch
+        match result with
+        | Choice1Of2 result ->
+            let buffer: ReadOnlySequence<byte> = result.Buffer
+            reader.AdvanceTo(buffer.End, buffer.End)
 
-        let totalString = str + mkString buffer
-        match result.IsCompleted with
-        | true ->
-            reader.Complete()
-            return totalString
-        | false ->
-            return! readFromPipeAsync reader totalString
+            let totalString = str + mkString buffer
+            match result.IsCompleted with
+            | true ->
+                reader.Complete()
+                return totalString
+            | false ->
+                return! readFromPipeAsync reader totalString
+        | Choice2Of2 _ -> // AggregateException, so we cant match on TimeoutException
+            return raise <| IncompleteResponseException str
     }
 
     let CallImplAsync (json: string) =
