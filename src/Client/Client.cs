@@ -60,7 +60,11 @@ namespace TcpEcho {
         {
             try
             {
-                return await CallImpl(json);
+                var reply = await CallImpl(json);
+                if (String.IsNullOrEmpty(reply)) {
+                    throw new Exception("Some problem while reading reply: it was empty");
+                }
+                return reply;
             }
             catch (SocketException ex)
             {
