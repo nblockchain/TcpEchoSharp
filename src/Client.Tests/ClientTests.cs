@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using NUnit.Framework;
@@ -35,9 +37,13 @@ namespace Client.Tests {
             "y4td57fxytoo5ki7.onion",
         };
 
-        private async Task LoopThroughElectrumServers (Func<TcpEcho.StratumClient,Task> action, uint repeatTimes = 0) {
+        private async Task LoopThroughElectrumServers (Func<TcpEcho.StratumClient,Task> action,
+                                                       uint repeatTimes = 0,
+                                                       List<Exception> exceptionsSoFar = null) {
             var successfulCount = 0;
+            var exceptions = exceptionsSoFar == null ? new List<Exception>() : exceptionsSoFar;
             Console.WriteLine();
+
             for (int i = 0; i < servers.Length; i++) {
                 Console.Write($"Trying to query '{servers[i]}'... ");
                 try {
@@ -45,22 +51,32 @@ namespace Client.Tests {
                     await action(client);
                     Console.WriteLine("success");
                     successfulCount++;
-                } catch (TcpEcho.CommunicationUnsuccessfulException error) {
-                    Console.Error.WriteLine ("failure");
                 }
-                catch (AggregateException aggEx)
+                catch (Exception ex)
                 {
-                    if (!(aggEx.InnerException is TcpEcho.CommunicationUnsuccessfulException))
-                        throw;
-                    Console.Error.WriteLine ("failure");
+                    if (ex is TcpEcho.CommunicationUnsuccessfulException || ex.InnerException is TcpEcho.CommunicationUnsuccessfulException)
+                        Console.Error.WriteLine("failure (unreliable server)");
+                    else
+                    {
+                        Console.Error.WriteLine("failure (buggy client)");
+                        exceptions.Add(ex);
+                    }
                 }
             }
             var successRatePercentage = 100.0 * successfulCount / servers.Length;
-            Console.WriteLine("Success rate: " + successRatePercentage + "%");
-            Assert.That (successfulCount, Is.GreaterThan(1));
+            Console.WriteLine($"Success rate: {successRatePercentage}% ({successfulCount} out of {servers.Length})");
 
-            if (repeatTimes > 0)
-                await LoopThroughElectrumServers(action, repeatTimes - 1);
+            if (repeatTimes > 0) {
+                await LoopThroughElectrumServers(action, repeatTimes - 1, exceptions);
+                Assert.That (successfulCount, Is.GreaterThan(0));
+            }
+            else {
+                Assert.That(exceptions.Count, Is.EqualTo(0),
+                            "There were some exceptions: " + Environment.NewLine + Environment.NewLine +
+                            String.Join(Environment.NewLine + Environment.NewLine, exceptions.Select(ex => ex.ToString())) +
+                            Environment.NewLine + Environment.NewLine);
+                Assert.That(successfulCount, Is.GreaterThan(0));
+            }
         }
 
         [Test]
