@@ -33,7 +33,8 @@ type Client(endpoint: string, port: int) =
             return Some Timeout
         }
 
-        match! Async.Choice([read; delay]) with
+        let! result = Async.Choice([read; delay])
+        match result with
         | Some x -> return x
         | None -> return Timeout
     }
