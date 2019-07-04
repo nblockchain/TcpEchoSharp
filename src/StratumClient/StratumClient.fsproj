@@ -12,5 +12,8 @@
     <PackageReference Include="System.IO.Pipelines" Version="4.5.0" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
     <Compile Include="StratumClient.fs" />
+    <PackageReference Include="FSharp.Data" Version="3.0.0" />
+    <Compile Include="ElectrumJsonFileParser.fs" />
+    <PackageReference Include="FSharp.Core" Version="4.3.4" />
   </ItemGroup>
 </Project>

@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Program\Program.csproj" />
+    <ProjectReference Include="..\StratumClient\StratumClient.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

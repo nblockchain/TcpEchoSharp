@@ -3,13 +3,18 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Diagnostics;
+
 using NUnit.Framework;
+
+using ElectrumServerDiscovery;
 
 namespace Client.Tests {
 
     [TestFixture]
     public class ClientTest {
-        public static readonly string[] servers = {
+
+        //https://1209k.com/bitcoin-eye/ele.php
+        private static readonly string[] hardCodedServersExtractedManuallyFrom1209kDotCom = {
             "185.64.116.15",
             "2azzarita.hopto.org",
             "4cii7ryno5j3axe4.onion",
@@ -37,6 +42,29 @@ namespace Client.Tests {
             "y4td57fxytoo5ki7.onion",
         };
 
+        private static readonly IEnumerable<ElectrumServer> electrumServersFromGeeWallet =
+            ElectrumJsonFileParser.ExtractServerList();
+
+        private IEnumerable<(string,uint)> GetAllServers()
+        {
+            var serversSet = new HashSet<(string, uint)>();
+
+            Console.WriteLine($"There are {hardCodedServersExtractedManuallyFrom1209kDotCom.Length} hardcoded servers");
+            foreach (var server in hardCodedServersExtractedManuallyFrom1209kDotCom)
+            {
+                serversSet.Add((server, 50001));
+            }
+
+            Console.WriteLine($"There are {electrumServersFromGeeWallet.Count()} servers from geewallet");
+            foreach (var server in electrumServersFromGeeWallet)
+            {
+                serversSet.Add((server.Fqdn, (uint) server.UnencryptedPort.Value));
+            }
+
+            Console.WriteLine($"There are {serversSet.Count} servers total");
+            return serversSet;
+        }
+
         private async Task LoopThroughElectrumServers (Func<TcpEcho.StratumClient,Task> action,
                                                        uint repeatTimes = 0,
                                                        List<Exception> exceptionsSoFar = null) {
@@ -44,10 +72,12 @@ namespace Client.Tests {
             var exceptions = exceptionsSoFar == null ? new List<Exception>() : exceptionsSoFar;
             Console.WriteLine();
 
-            for (int i = 0; i < servers.Length; i++) {
-                Console.Write($"Trying to query '{servers[i]}'... ");
+            var allServers = GetAllServers();
+            var serverCount = allServers.Count();
+            foreach (var (server,port) in allServers) {
+                Console.Write($"Trying to query '{server}'... ");
                 try {
-                    var client = new TcpEcho.StratumClient (servers[i], 50001);
+                    var client = new TcpEcho.StratumClient (server, 50001);
                     await action(client);
                     Console.WriteLine("success");
                     successfulCount++;
@@ -63,8 +93,8 @@ namespace Client.Tests {
                     }
                 }
             }
-            var successRatePercentage = 100.0 * successfulCount / servers.Length;
-            Console.WriteLine($"Success rate: {successRatePercentage}% ({successfulCount} out of {servers.Length})");
+            var successRatePercentage = 100.0 * successfulCount / serverCount;
+            Console.WriteLine($"Success rate: {successRatePercentage}% ({successfulCount} out of {serverCount})");
 
             if (repeatTimes > 0) {
                 await LoopThroughElectrumServers(action, repeatTimes - 1, exceptions);
