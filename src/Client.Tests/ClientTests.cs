@@ -42,6 +42,9 @@ namespace Client.Tests {
             "y4td57fxytoo5ki7.onion",
         };
 
+        private static readonly IEnumerable<ElectrumServer> electrumServersFromMonitoringWebPage =
+            ElectrumServerWebPageExtractor.ExtractServerList();
+
         private static readonly IEnumerable<ElectrumServer> electrumServersFromGeeWallet =
             ElectrumJsonFileParser.ExtractServerList();
 
@@ -49,10 +52,10 @@ namespace Client.Tests {
         {
             var serversSet = new HashSet<(string, uint)>();
 
-            Console.WriteLine($"There are {hardCodedServersExtractedManuallyFrom1209kDotCom.Length} hardcoded servers");
-            foreach (var server in hardCodedServersExtractedManuallyFrom1209kDotCom)
+            Console.WriteLine($"There are {electrumServersFromMonitoringWebPage.Count()} servers from the bitcoin-eye website");
+            foreach (var server in electrumServersFromMonitoringWebPage)
             {
-                serversSet.Add((server, 50001));
+                serversSet.Add((server.Fqdn, (uint)server.UnencryptedPort.Value));
             }
 
             Console.WriteLine($"There are {electrumServersFromGeeWallet.Count()} servers from geewallet");

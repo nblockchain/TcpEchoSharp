@@ -7,10 +7,10 @@ open System.Net
 type ElectrumServer =
     {
         Fqdn: string
-        Pruning: string
+        Pruning: Option<string>
         PrivatePort: Option<int>
         UnencryptedPort: Option<int>
-        Version: string
+        Version: Option<string>
     }
     member self.CheckCompatibility (): unit =
         if self.UnencryptedPort.IsNone then
@@ -43,10 +43,10 @@ module ElectrumJsonFileParser =
                         | None -> None
                         | Some portAsString -> Some (Int32.Parse (portAsString.AsString()))
                     yield { Fqdn = key;
-                            Pruning = value?pruning.AsString();
+                            Pruning = Some (value?pruning.AsString())
                             PrivatePort = encryptedPort;
                             UnencryptedPort = unencryptedPort;
-                            Version = value?version.AsString(); }
+                            Version = Some (value?version.AsString()) }
             }
         servers |> List.ofSeq
 

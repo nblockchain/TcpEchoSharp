@@ -15,5 +15,7 @@
     <PackageReference Include="FSharp.Data" Version="3.0.0" />
     <Compile Include="ElectrumJsonFileParser.fs" />
     <PackageReference Include="FSharp.Core" Version="4.3.4" />
+    <Compile Include="ElectrumServerWebPageExtractor.fs" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.11.8" />
   </ItemGroup>
 </Project>
