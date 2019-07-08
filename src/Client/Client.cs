@@ -17,13 +17,13 @@ namespace TcpEcho {
         }
     }
 
-    public abstract class Client {
+    public abstract class JsonRpcClient {
         private const int minimumBufferSize = 1024;
         private const int tcpTimeout = 1000;
         private string endpoint = "";
         private int port = 0;
 
-        public Client (string _endpoint, int _port) {
+        public JsonRpcClient(string _endpoint, int _port) {
             endpoint = _endpoint;
             port = _port;
         }
@@ -77,23 +77,22 @@ namespace TcpEcho {
         }
 
         private static async Task WriteToPipeAsync (Socket socket, PipeWriter writer) {
-            int read = 0;
             FlushResult result;
 
-            do {
-                Memory<byte> memory = writer.GetMemory (minimumBufferSize);
-
-                if ((read = await socket.ReceiveAsync(memory, SocketFlags.None)) == 0) {
-                    break;
+            await Task.Yield();
+            while (true)
+            {
+                if (socket.Available > 0)
+                {
+                    var memory = writer.GetMemory(minimumBufferSize);
+                    var bytesRead = await socket.ReceiveAsync(memory, SocketFlags.None);
+                    writer.Advance(bytesRead);
                 }
-
-                writer.Advance (read);
 
                 if ((result = await writer.FlushAsync ()).IsCompleted) {
                     break;
                 }
             }
-            while (socket.Available > 0);
 
             writer.Complete ();
         }
@@ -108,11 +107,12 @@ namespace TcpEcho {
                 strResult += content;
                 reader.AdvanceTo (buffer.End, buffer.End);
 
-                if (result.IsCompleted) {
+                if (result.IsCompleted || strResult.EndsWith("\n")) {
                     break;
                 }
             }
 
+            reader.Complete();
             return strResult;
         }
 

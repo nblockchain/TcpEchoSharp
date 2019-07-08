@@ -1,4 +1,4 @@
-namespace TcpEcho
+﻿namespace TcpEcho
 
 open System
 
@@ -28,7 +28,7 @@ type Request = {
 }
 
 type StratumClient(endpoint: string, port: int) =
-    inherit Client(endpoint, port)
+    inherit JsonRpcClient(endpoint, port)
 
     static member Deserialize<'T> json: 'T =
         try
