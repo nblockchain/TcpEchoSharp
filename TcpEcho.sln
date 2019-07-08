@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26124.0
 MinimumVisualStudioVersion = 15.0.26124.0
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Client", "src\Client\Client.csproj", "{745621A3-24CB-4FB9-AD0D-7FA82328696E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JsonRpcClient", "src\JsonRpcClient\JsonRpcClient.csproj", "{745621A3-24CB-4FB9-AD0D-7FA82328696E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientTests", "src\Client.Tests\ClientTests.csproj", "{C0F0C371-E0F4-440B-BDC0-699B637E6494}"
 EndProject

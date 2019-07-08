@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+
 using System;
 using System.Buffers;
 using System.IO.Pipelines;
@@ -19,18 +19,18 @@ namespace TcpEcho {
 
     public abstract class JsonRpcClient {
         private const int minimumBufferSize = 1024;
-        private const int tcpTimeout = 1000;
-        private string endpoint = "";
-        private int port = 0;
+        private readonly TimeSpan tcpTimeout = TimeSpan.FromSeconds(1);
+        private readonly string endpoint;
+        private readonly int port;
 
-        public JsonRpcClient(string _endpoint, int _port) {
-            endpoint = _endpoint;
-            port = _port;
+        public JsonRpcClient(string endpoint, int port) {
+            this.endpoint = endpoint;
+            this.port = port;
         }
 
         private async Task<string> CallImpl (string json) {
             using (Socket socket = new Socket (SocketType.Stream, ProtocolType.Tcp)) {
-                socket.ReceiveTimeout = tcpTimeout;
+                socket.ReceiveTimeout = (int)tcpTimeout.TotalMilliseconds;
 
                 var connectTimeOut = Task.Delay (tcpTimeout);
                 var completedConnTask = await Task.WhenAny (connectTimeOut, socket.ConnectAsync (endpoint, port));
@@ -38,7 +38,7 @@ namespace TcpEcho {
                     throw new TimeoutException("connect timed out");
                 }
 
-                byte[] bytesToSend = UTF8Encoding.UTF8.GetBytes (json + Environment.NewLine);
+                byte[] bytesToSend = Encoding.UTF8.GetBytes (json + Environment.NewLine);
                 socket.Send (bytesToSend);
 
                 var pipe = new Pipe ();
@@ -77,8 +77,6 @@ namespace TcpEcho {
         }
 
         private static async Task WriteToPipeAsync (Socket socket, PipeWriter writer) {
-            FlushResult result;
-
             await Task.Yield();
             while (true)
             {
@@ -89,7 +87,8 @@ namespace TcpEcho {
                     writer.Advance(bytesRead);
                 }
 
-                if ((result = await writer.FlushAsync ()).IsCompleted) {
+                var flushResult = await writer.FlushAsync ();
+                if (flushResult.IsCompleted) {
                     break;
                 }
             }
@@ -98,7 +97,7 @@ namespace TcpEcho {
         }
 
         private static async Task<string> ReadFromPipeAsync (PipeReader reader) {
-            var strResult = "";
+            var strResult = String.Empty;
             while (true) {
                 ReadResult result = await reader.ReadAsync ();
                 ReadOnlySequence<byte> buffer = result.Buffer;
@@ -117,13 +116,13 @@ namespace TcpEcho {
         }
 
         private static string UTF8String (ReadOnlySequence<byte> buffer) {
-            var result = "";
+            var result = String.Empty;
             foreach (ReadOnlyMemory<byte> segment in buffer)
             {
 #if NETCOREAPP2_1
-                result += UTF8Encoding.UTF8.GetString (segment.Span);
+                result += Encoding.UTF8.GetString (segment.Span);
 #else
-                result += UTF8Encoding.UTF8.GetString (segment);
+                result += Encoding.UTF8.GetString (segment);
 #endif
             }
             return result;
