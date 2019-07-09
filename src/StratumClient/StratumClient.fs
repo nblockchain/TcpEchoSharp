@@ -45,7 +45,6 @@ type StratumClient(endpoint: string, port: int) =
         with
            // The data may be incomplete, corrupted, or just fine so lets try parse it anyways
            | IncompleteResponseException response -> return response
-           | ex -> return raise ex
     }
 
     member this.BlockchainTransactionGet(id: int, transactionId: string) = Async.StartAsTask(async {

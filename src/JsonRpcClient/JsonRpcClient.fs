@@ -17,12 +17,6 @@ type TimeoutOrResult<'a> = Timeout | Result of 'a
 type Client(endpoint: string, port: int) =
     let minimumBufferSize = 1024
 
-    let mkString (buffer: ReadOnlySequence<byte>) =
-        let sb = StringBuilder()
-        for segment in buffer do
-            segment.ToArray() |> Encoding.UTF8.GetString |> sb.Append |> ignore
-        sb.ToString()
-
     let withTimeout (timeout : int) (xAsync: Async<'a>) = async {
         let read = async {
             let! value = xAsync
@@ -58,27 +52,26 @@ type Client(endpoint: string, port: int) =
                 return! writeToPipeAsync writer socket
     }
 
-    let rec readFromPipeAsync (reader: PipeReader) str = async {
+    let rec readFromPipeAsync (reader: PipeReader) (sb: StringBuilder) = async {
         try
             let! result = reader.ReadAsync().AsTask() |> Async.AwaitTask
 
             let buffer: ReadOnlySequence<byte> = result.Buffer
 
-            let totalString = str + mkString buffer
+            buffer.ToArray() |> Encoding.UTF8.GetString |> sb.Append |> ignore
+
             reader.AdvanceTo(buffer.End)
 
             match result.IsCompleted with
             | true ->
                 reader.Complete()
-                return totalString
+                return sb.ToString()
             | false ->
-                return! readFromPipeAsync reader totalString
+                return! readFromPipeAsync reader sb
         with
             // If we got an TimeoutException anywhere in the exception chain
             | :? AggregateException as ae when ae.Flatten().InnerExceptions |> Seq.exists (fun x -> x :? TimeoutException) ->
-                return raise <| IncompleteResponseException str
-            | ex ->
-                return raise ex
+                return raise <| IncompleteResponseException (sb.ToString())
     }
 
     let CallImplAsync (json: string) =
@@ -96,7 +89,7 @@ type Client(endpoint: string, port: int) =
                 let pipe = Pipe()
 
                 let! _ = writeToPipeAsync pipe.Writer socket |> Async.StartChild
-                return! readFromPipeAsync pipe.Reader ""
+                return! readFromPipeAsync pipe.Reader (StringBuilder())
             | Timeout -> return raise (CommunicationUnsuccessfulException("Socket send timed out", null))
         }
 
