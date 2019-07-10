@@ -34,22 +34,24 @@ type Client(endpoint: string, port: int) =
     }
 
     let rec writeToPipeAsync (writer: PipeWriter) (socket: Socket) = async {
-        let segment = Array.zeroCreate<byte> minimumBufferSize |> ArraySegment
-        let! read = socket.ReceiveAsync(segment, SocketFlags.None) |> Async.AwaitTask |> withTimeout socket.ReceiveTimeout
+        try
+            let segment = Array.zeroCreate<byte> minimumBufferSize |> ArraySegment
+            let! read = socket.ReceiveAsync(segment, SocketFlags.None) |> Async.AwaitTask |> withTimeout socket.ReceiveTimeout
 
-        match read with
-        | Timeout ->
-            return writer.Complete(TimeoutException("Socket read timed out"))
-        | Result 0 ->
-            return writer.Complete()
-        | Result bytesRead ->
-            segment.Array.CopyTo(writer.GetMemory(bytesRead))
-            writer.Advance bytesRead
-            let! flusher = writer.FlushAsync().AsTask() |> Async.AwaitTask
-            if flusher.IsCompleted then
+            match read with
+            | Timeout ->
+                return writer.Complete(TimeoutException("Socket read timed out"))
+            | Result 0 ->
                 return writer.Complete()
-            else
-                return! writeToPipeAsync writer socket
+            | Result bytesRead ->
+                segment.Array.CopyTo(writer.GetMemory(bytesRead))
+                writer.Advance bytesRead
+                let! flusher = writer.FlushAsync().AsTask() |> Async.AwaitTask
+                if flusher.IsCompleted then
+                    return writer.Complete()
+                else
+                    return! writeToPipeAsync writer socket
+        with ex -> return writer.Complete(ex)
     }
 
     let rec readFromPipeAsync (reader: PipeReader) (sb: StringBuilder) = async {
