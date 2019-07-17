@@ -60,7 +60,7 @@ type Client(endpoint: string, port: int) =
 
             let buffer: ReadOnlySequence<byte> = result.Buffer
 
-            buffer.ToArray() |> Encoding.UTF8.GetString |> sb.Append |> ignore
+            buffer |> ref |> BuffersExtensions.ToArray |> Encoding.UTF8.GetString |> sb.Append |> ignore
 
             reader.AdvanceTo(buffer.End)
 
