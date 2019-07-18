@@ -16,6 +16,7 @@ type TimeoutOrResult<'a> = Timeout | Result of 'a
 [<AbstractClass>]
 type Client(endpoint: string, port: int) =
     let minimumBufferSize = 1024
+    let tcpTimeout = 1000
 
     let withTimeout (timeout : int) (xAsync: Async<'a>) = async {
         let read = async {
@@ -33,10 +34,17 @@ type Client(endpoint: string, port: int) =
         | None -> return Timeout
     }
 
+    let unwrapTimeout timeoutMsg x = async {
+        let! v = x
+        match v with
+        | Timeout -> return raise (CommunicationUnsuccessfulException(timeoutMsg, null))
+        | Result a -> return a
+    }
+
     let rec writeToPipeAsync (writer: PipeWriter) (socket: Socket) = async {
         try
             let segment = Array.zeroCreate<byte> minimumBufferSize |> ArraySegment
-            let! read = socket.ReceiveAsync(segment, SocketFlags.None) |> Async.AwaitTask |> withTimeout socket.ReceiveTimeout
+            let! read = socket.ReceiveAsync(segment, SocketFlags.None) |> Async.AwaitTask |> withTimeout tcpTimeout
 
             match read with
             | Timeout ->
@@ -79,20 +87,14 @@ type Client(endpoint: string, port: int) =
     let CallImplAsync (json: string) =
         async {
             use socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
-            socket.ReceiveTimeout <- 500
-            socket.SendTimeout <- 500
-            do! socket.ConnectAsync(endpoint, port) |> Async.AwaitTask
-
+            let! connect = socket.ConnectAsync(endpoint, port) |> Async.AwaitTask |> withTimeout tcpTimeout |> unwrapTimeout "Socket connect timed out"
             let segment = UTF8Encoding.UTF8.GetBytes(json + Environment.NewLine) |> ArraySegment
 
-            let! send = socket.SendAsync(segment, SocketFlags.None) |> Async.AwaitTask |> withTimeout socket.SendTimeout
-            match send with
-            | Result _ ->
-                let pipe = Pipe()
+            let! send = socket.SendAsync(segment, SocketFlags.None) |> Async.AwaitTask |> withTimeout tcpTimeout |> unwrapTimeout "Socket send timed out"
+            let pipe = Pipe()
 
-                let! _ = writeToPipeAsync pipe.Writer socket |> Async.StartChild
-                return! readFromPipeAsync pipe.Reader (StringBuilder())
-            | Timeout -> return raise (CommunicationUnsuccessfulException("Socket send timed out", null))
+            let! _ = writeToPipeAsync pipe.Writer socket |> Async.StartChild
+            return! readFromPipeAsync pipe.Reader (StringBuilder())
         }
 
     abstract member CallAsync: string -> Async<string>
